@@ -38,7 +38,7 @@ app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
 app.get('/', (req, res) => {
-  res.send('Hello world')
+  res.send('Helllllllo world')
 })
 
 app.post('/seedUser', (req, res) => {
@@ -76,5 +76,9 @@ app.post('/getToken', (req, res) => {
 app.get('/protected', passport.authenticate('jwt', {session: false}), (req, res) => {
   res.send('i\m protected')
 })
-const PORT = process.env.PORT || 3000
+
+app.get('/getUser', passport.authenticate('jwt', {session: false}), (req, res) => {
+  res.send(req.user)
+})
+const PORT = process.env.PORT || 3001
 app.listen(PORT)
