@@ -1,5 +1,6 @@
 const dotenv = require('dotenv')
 dotenv.config()
+const bodyParser = require('body-parser')
 const express = require('express')
 const app = new express()
 
@@ -13,6 +14,12 @@ const bookshelf = require('bookshelf')
 const securePassword = require('bookshelf-secure-password')
 const db = bookshelf(knexDb)
 db.plugin(securePassword)
+const jwt = require('jsonwebtoken')
+
+const User = db.Model.extend({
+  tableName: 'login_user',
+  hasSecurePassword: true
+})
 
 const opts = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -21,15 +28,53 @@ const opts = {
 
 const strategy = new JwtStrategy(opts, (payload, next) => {
   // TODO: get user from DB
-  const user = null
-  next(null, user)
+  User.forge({id: payload.id}).fetch().then(res => {
+    next(null, res)
+  })
 })
 passport.use(strategy)
 app.use(passport.initialize())
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
 
 app.get('/', (req, res) => {
   res.send('Hello world')
 })
 
+app.post('/seedUser', (req, res) => {
+  if (!req.body.email || !req.body.password) {
+    return res.status(401).send('no fields');
+  }
+
+  const user = new User({
+    email: req.body.email,
+    password: req.body.password
+  });
+
+  user.save().then(() => {
+    res.send('ok');
+  });
+});
+app.post('/getToken', (req, res) => {
+  if(!req.body.email || !req.body.password) {
+    return res.status(401).send('fields not sent')
+  }
+  User.forge({email: req.body.email}).fetch().then(result => {
+    if(!result) {
+      return res.status(400).send('user not found')
+    }
+    result.authenticate(req.body.password).then(user => {
+      const payload = { id: user.id }
+      const token = jwt.sign(payload, process.env.SECRET_OR_KEY)
+      res.send(token)
+    }).catch(err => {
+      return res.status(401).send({ err: err })
+    })
+  })
+})
+
+app.get('/protected', passport.authenticate('jwt', {session: false}), (req, res) => {
+  res.send('i\m protected')
+})
 const PORT = process.env.PORT || 3000
 app.listen(PORT)
